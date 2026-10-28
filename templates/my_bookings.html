@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}My Bookings · {{ app_name }}{% endblock %}
+{% block header_action %}<a class="quiet-link" href="{{ url_for('index') }}">Book another walk</a>{% endblock %}
+
+{% block content %}
+<section class="my-dashboard wrap">
+  <div class="dashboard-title-row">
+    <div>
+      <div class="eyebrow">MY BOOKINGS</div>
+      <h1>Hi, {{ profile['name'] }}.</h1>
+      <p class="hero-copy dashboard-copy">Your bookings are linked to {{ contact_display(profile) }}.</p>
+    </div>
+    <a class="secondary-button" href="{{ url_for('index') }}">Book another walk</a>
+  </div>
+
+  <div class="card schedule-card">
+    <div class="card-title-row"><h2>Upcoming walks</h2><span class="pill">{{ upcoming|length }} upcoming</span></div>
+    {% if upcoming %}
+      <div class="booking-list">
+        {% for booking in upcoming %}
+          <div class="booking-item">
+            <div class="booking-main">
+              <div class="booking-date">{{ format_date(booking['date']) }}</div>
+              <div class="booking-time">{{ format_time(booking['start_time']) }}–{{ format_time(booking['end_time']) }}</div>
+            </div>
+            <div class="booking-actions">
+              <a class="small-button" href="{{ url_for('booking_calendar_download', token=manage_token, booking_id=booking['id']) }}">Apple / Outlook</a>
+              <a class="small-button" href="{{ google_calendar_url(booking) }}" target="_blank" rel="noopener">Google Calendar</a>
+              <form method="post" action="{{ url_for('walker_cancel_booking', token=manage_token, booking_id=booking['id']) }}" onsubmit="return confirm('Cancel this walk?');">
+                <button class="danger-button" type="submit">Cancel walk</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">You do not have any upcoming walks.</div>
+    {% endif %}
+  </div>
+
+  <div class="card schedule-card">
+    <div class="card-title-row"><h2>Past and cancelled</h2><span class="muted">History</span></div>
+    {% if history %}
+      <div class="booking-list compact-list">
+        {% for booking in history %}
+          <div class="booking-item compact-item">
+            <div>
+              <div class="booking-date">{{ format_date(booking['date']) }}</div>
+              <div class="booking-time">{{ format_time(booking['start_time']) }}</div>
+            </div>
+            <span class="status-pill {{ booking['status'] }}">{{ booking['status']|capitalize }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">No booking history yet.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
