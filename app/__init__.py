@@ -8,6 +8,7 @@ confirmation can be delivered after the database commit succeeds.
 import functools
 import importlib.util
 import re
+import sys
 from pathlib import Path
 
 from notifications import send_booking_confirmation
@@ -15,6 +16,7 @@ from notifications import send_booking_confirmation
 _ROOT_APP = Path(__file__).resolve().parent.parent / "app.py"
 _spec = importlib.util.spec_from_file_location("walks_original_app", _ROOT_APP)
 _original = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _original
 _spec.loader.exec_module(_original)
 
 app = _original.app
