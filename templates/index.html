@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Book a Walk · {{ app_name }}{% endblock %}
-{% block header_action %}<a class="quiet-link" href="{{ url_for('admin_login') }}">Jack's dashboard</a>{% endblock %}
+{% block header_action %}
+<div class="header-actions">
+  {% if session.get('walker_token') %}<a class="quiet-link" href="{{ url_for('my_bookings') }}">My bookings</a>{% endif %}
+  <a class="quiet-link" href="{{ url_for('admin_login') }}">Jack's dashboard</a>
+</div>
+{% endblock %}
 
 {% block content %}
 <section class="hero wrap">
@@ -53,9 +58,21 @@
       <label for="name">Name</label>
       <input id="name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="Your name" required>
 
-      <label for="email">Email</label>
-      <input id="email" name="email" type="email" maxlength="160" autocomplete="email" placeholder="you@example.com" required>
-      <p class="field-note">Your email is used to enforce the two-walk daily limit.</p>
+      <label>How should we identify your bookings?</label>
+      <div class="contact-choice" role="radiogroup" aria-label="Contact method">
+        <label class="contact-option">
+          <input type="radio" name="contact_method" value="email" checked>
+          <span>Email</span>
+        </label>
+        <label class="contact-option">
+          <input type="radio" name="contact_method" value="phone">
+          <span>Phone number</span>
+        </label>
+      </div>
+
+      <label id="contact-label" for="contact">Email</label>
+      <input id="contact" name="contact" type="email" maxlength="160" autocomplete="email" placeholder="you@example.com" required>
+      <p id="contact-note" class="field-note">Your email is used for your two-walk daily limit and your private booking dashboard.</p>
 
       <div id="selection-summary" class="selection-summary">
         <span>No time selected yet</span>
