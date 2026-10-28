@@ -5,6 +5,10 @@ const slotGrid = document.getElementById('slot-grid');
 const slotCount = document.getElementById('slot-count');
 const summary = document.getElementById('selection-summary');
 const bookButton = document.getElementById('book-button');
+const contactInput = document.getElementById('contact');
+const contactLabel = document.getElementById('contact-label');
+const contactNote = document.getElementById('contact-note');
+const contactRadios = document.querySelectorAll('input[name="contact_method"]');
 
 let selectedTime = '';
 
@@ -28,6 +32,28 @@ function wireSlots() {
   document.querySelectorAll('.slot').forEach(button => {
     button.addEventListener('click', () => selectSlot(button));
   });
+}
+
+function updateContactMethod() {
+  const selected = document.querySelector('input[name="contact_method"]:checked')?.value || 'email';
+  if (!contactInput || !contactLabel || !contactNote) return;
+  if (selected === 'phone') {
+    contactLabel.textContent = 'Phone number';
+    contactInput.type = 'tel';
+    contactInput.inputMode = 'tel';
+    contactInput.autocomplete = 'tel';
+    contactInput.placeholder = '(705) 555-1234';
+    contactInput.maxLength = 30;
+    contactNote.textContent = 'Your phone number is used for your two-walk daily limit and your private booking dashboard.';
+  } else {
+    contactLabel.textContent = 'Email';
+    contactInput.type = 'email';
+    contactInput.inputMode = 'email';
+    contactInput.autocomplete = 'email';
+    contactInput.placeholder = 'you@example.com';
+    contactInput.maxLength = 160;
+    contactNote.textContent = 'Your email is used for your two-walk daily limit and your private booking dashboard.';
+  }
 }
 
 async function loadSlots(date) {
@@ -59,4 +85,6 @@ async function loadSlots(date) {
 }
 
 datePicker?.addEventListener('change', () => loadSlots(datePicker.value));
+contactRadios.forEach(radio => radio.addEventListener('change', updateContactMethod));
 wireSlots();
+updateContactMethod();
