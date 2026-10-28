@@ -64,14 +64,14 @@
     {% if upcoming %}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Time</th><th>Walker</th><th>Email</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Time</th><th>Walker</th><th>Contact</th><th></th></tr></thead>
           <tbody>
           {% for booking in upcoming %}
             <tr>
               <td>{{ format_date(booking['date']) }}</td>
               <td>{{ format_time(booking['start_time']) }}</td>
               <td><strong>{{ booking['name'] }}</strong></td>
-              <td>{{ booking['email'] }}</td>
+              <td>{{ contact_display(booking) }}</td>
               <td>
                 <form method="post" action="{{ url_for('cancel_booking', booking_id=booking['id']) }}" onsubmit="return confirm('Cancel this walk?');">
                   <button class="danger-link" type="submit">Cancel</button>
