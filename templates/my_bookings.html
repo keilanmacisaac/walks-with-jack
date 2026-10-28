@@ -22,6 +22,9 @@
             <div class="booking-main">
               <div class="booking-date">{{ format_date(booking['date']) }}</div>
               <div class="booking-time">{{ format_time(booking['start_time']) }}–{{ format_time(booking['end_time']) }}</div>
+              {% if booking['walker_notes'] %}
+                <div class="walker-note-display"><strong>Your note to Jack:</strong><br>{{ booking['walker_notes'] }}</div>
+              {% endif %}
             </div>
             <div class="booking-actions">
               <a class="small-button" href="{{ url_for('booking_calendar_download', token=manage_token, booking_id=booking['id']) }}">Apple / Outlook</a>
@@ -30,6 +33,13 @@
                 <button class="danger-button" type="submit">Cancel walk</button>
               </form>
             </div>
+            <form class="walker-note-editor" method="post" action="{{ url_for('walker_update_notes', token=manage_token, booking_id=booking['id']) }}">
+              <label for="walker-note-{{ booking['id'] }}">Note for Jack</label>
+              <textarea id="walker-note-{{ booking['id'] }}" name="walker_notes" maxlength="1000" placeholder="Add anything Jack should know before your walk.">{{ booking['walker_notes'] or '' }}</textarea>
+              <div class="admin-control-actions">
+                <button class="small-secondary-button" type="submit">Save note</button>
+              </div>
+            </form>
           </div>
         {% endfor %}
       </div>
@@ -47,6 +57,7 @@
             <div>
               <div class="booking-date">{{ format_date(booking['date']) }}</div>
               <div class="booking-time">{{ format_time(booking['start_time']) }}</div>
+              {% if booking['walker_notes'] %}<div class="walker-note-display">{{ booking['walker_notes'] }}</div>{% endif %}
             </div>
             <span class="status-pill {{ booking['status'] }}">{{ booking['status']|capitalize }}</span>
           </div>
