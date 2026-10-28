@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Walk booked · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="center-wrap">
+  <div class="card success-card">
+    <div class="success-icon">✓</div>
+    <div class="eyebrow">BOOKED</div>
+    <h1>You're walking with Jack.</h1>
+    <p class="hero-copy">Your free 5-minute walk is confirmed.</p>
+
+    <div class="confirmation-box">
+      <div>
+        <span>Date</span>
+        <strong>{{ format_date(booking['date']) }}</strong>
+      </div>
+      <div>
+        <span>Time</span>
+        <strong>{{ format_time(booking['start_time']) }}–{{ format_time(booking['end_time']) }}</strong>
+      </div>
+      <div>
+        <span>Name</span>
+        <strong>{{ booking['name'] }}</strong>
+      </div>
+    </div>
+
+    <a class="primary-button button-link" href="{{ url_for('index') }}">Book another walk</a>
+    <p class="field-note centered">You can book up to two walks on the same day.</p>
+  </div>
+</section>
+{% endblock %}

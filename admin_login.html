@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Jack's Dashboard Login · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="center-wrap">
+  <div class="card login-card">
+    <div class="eyebrow">PRIVATE</div>
+    <h1>Jack's dashboard</h1>
+    <p class="hero-copy">Enter the dashboard password to view bookings and statistics.</p>
+    <form method="post">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+      <button class="primary-button" type="submit">Open dashboard</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

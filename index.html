@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Book a Walk · {{ app_name }}{% endblock %}
+{% block header_action %}<a class="quiet-link" href="{{ url_for('admin_login') }}">Jack's dashboard</a>{% endblock %}
+
+{% block content %}
+<section class="hero wrap">
+  <div class="eyebrow">FREE • 5 MINUTES</div>
+  <h1>Book a walk with Jack.</h1>
+  <p class="hero-copy">Pick an open 5-minute time between 8:00 AM and 2:15 PM. Each person can book up to two walks per day.</p>
+</section>
+
+<section class="booking-layout wrap">
+  <div class="card booking-card">
+    <div class="section-heading">
+      <div>
+        <span class="step">1</span>
+        <h2>Choose a day</h2>
+      </div>
+      <span class="pill">$0</span>
+    </div>
+
+    <label for="date-picker">Date</label>
+    <input id="date-picker" type="date" min="{{ min_date }}" max="{{ max_date }}" value="{{ selected_date }}">
+
+    <div class="section-heading slot-heading">
+      <div>
+        <span class="step">2</span>
+        <h2>Choose a time</h2>
+      </div>
+      <span id="slot-count" class="muted">{{ slots|length }} open</span>
+    </div>
+
+    <div id="slot-grid" class="slot-grid" aria-live="polite">
+      {% for slot in slots %}
+        <button type="button" class="slot" data-value="{{ slot.value }}">{{ slot.label }}</button>
+      {% else %}
+        <div class="empty-slots">No open times on this day. Try another date.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card form-card">
+    <div class="section-heading">
+      <div>
+        <span class="step">3</span>
+        <h2>Your details</h2>
+      </div>
+    </div>
+    <form id="booking-form" method="post" action="{{ url_for('book') }}">
+      <input type="hidden" id="form-date" name="date" value="{{ selected_date }}">
+      <input type="hidden" id="form-time" name="start_time" value="">
+
+      <label for="name">Name</label>
+      <input id="name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="Your name" required>
+
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" maxlength="160" autocomplete="email" placeholder="you@example.com" required>
+      <p class="field-note">Your email is used to enforce the two-walk daily limit.</p>
+
+      <div id="selection-summary" class="selection-summary">
+        <span>No time selected yet</span>
+      </div>
+      <button id="book-button" class="primary-button" type="submit" disabled>Book my free walk</button>
+    </form>
+  </div>
+</section>
+
+<section class="rules wrap">
+  <div><strong>5 min</strong><span>per walk</span></div>
+  <div><strong>2 max</strong><span>per person/day</span></div>
+  <div><strong>8:00–2:15</strong><span>booking window</span></div>
+  <div><strong>Free</strong><span>always</span></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
