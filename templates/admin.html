@@ -28,6 +28,12 @@
         <div class="next-time">{{ format_time(next_booking['start_time']) }}</div>
         <div class="next-date">{{ format_date(next_booking['date']) }}</div>
         <div class="next-person">with <strong>{{ next_booking['name'] }}</strong></div>
+        {% if next_booking['walker_notes'] %}
+          <div class="admin-note-block">
+            <div class="admin-note-label">Walker note</div>
+            <div class="admin-note-text">{{ next_booking['walker_notes'] }}</div>
+          </div>
+        {% endif %}
       {% else %}
         <div class="empty-state">No upcoming walks yet.</div>
       {% endif %}
@@ -62,25 +68,53 @@
   <div class="card schedule-card">
     <div class="card-title-row"><h2>Upcoming walks</h2><span class="muted">Next {{ upcoming|length }}</span></div>
     {% if upcoming %}
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Time</th><th>Walker</th><th>Contact</th><th></th></tr></thead>
-          <tbody>
-          {% for booking in upcoming %}
-            <tr>
-              <td>{{ format_date(booking['date']) }}</td>
-              <td>{{ format_time(booking['start_time']) }}</td>
-              <td><strong>{{ booking['name'] }}</strong></td>
-              <td>{{ contact_display(booking) }}</td>
-              <td>
-                <form method="post" action="{{ url_for('cancel_booking', booking_id=booking['id']) }}" onsubmit="return confirm('Cancel this walk?');">
-                  <button class="danger-link" type="submit">Cancel</button>
-                </form>
-              </td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+      <div class="admin-booking-list">
+        {% for booking in upcoming %}
+          <article class="admin-booking-card">
+            <div class="admin-booking-top">
+              <div>
+                <div class="admin-booking-name">{{ booking['name'] }}</div>
+                <div class="admin-booking-meta">{{ format_date(booking['date']) }} · {{ format_time(booking['start_time']) }}–{{ format_time(booking['end_time']) }}</div>
+                <div class="admin-booking-meta">{{ contact_display(booking) }}</div>
+              </div>
+              <form method="post" action="{{ url_for('admin_delete_booking', booking_id=booking['id']) }}" onsubmit="return confirm('Permanently delete this booking? This cannot be undone.');">
+                <button class="delete-booking-button" type="submit">Delete booking</button>
+              </form>
+            </div>
+
+            <div class="admin-note-block">
+              <div class="admin-note-label">Note from walker</div>
+              {% if booking['walker_notes'] %}
+                <div class="admin-note-text">{{ booking['walker_notes'] }}</div>
+              {% else %}
+                <div class="admin-note-empty">No note from the walker.</div>
+              {% endif %}
+            </div>
+
+            <div class="admin-controls-grid">
+              <form class="admin-control-box" method="post" action="{{ url_for('admin_move_booking', booking_id=booking['id']) }}">
+                <h3>Change booking time</h3>
+                <label for="date-{{ booking['id'] }}">Date</label>
+                <input id="date-{{ booking['id'] }}" name="date" type="date" value="{{ booking['date'] }}" required>
+                <label for="time-{{ booking['id'] }}">Start time</label>
+                <input id="time-{{ booking['id'] }}" name="start_time" type="time" min="08:00" max="14:10" step="300" value="{{ booking['start_time'] }}" required>
+                <div class="admin-control-actions">
+                  <button class="small-secondary-button" type="submit">Update time</button>
+                </div>
+                <p class="field-note">If another person already has that time, the change will be blocked.</p>
+              </form>
+
+              <form class="admin-control-box" method="post" action="{{ url_for('admin_save_booking_notes', booking_id=booking['id']) }}">
+                <h3>Jack's private note</h3>
+                <label for="jack-note-{{ booking['id'] }}">Only Jack sees this</label>
+                <textarea id="jack-note-{{ booking['id'] }}" name="jack_notes" maxlength="1000" placeholder="Add reminders or details for this walk.">{{ booking['jack_notes'] or '' }}</textarea>
+                <div class="admin-control-actions">
+                  <button class="small-secondary-button" type="submit">Save note</button>
+                </div>
+              </form>
+            </div>
+          </article>
+        {% endfor %}
       </div>
     {% else %}
       <div class="empty-state">No upcoming bookings.</div>
