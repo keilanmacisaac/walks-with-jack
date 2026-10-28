@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block header_action %}
+<form method="post" action="{{ url_for('admin_logout') }}"><button class="text-button" type="submit">Log out</button></form>
+{% endblock %}
+
+{% block content %}
+<section class="dashboard wrap">
+  <div class="dashboard-title-row">
+    <div>
+      <div class="eyebrow">JACK'S DASHBOARD</div>
+      <h1>Walking schedule</h1>
+    </div>
+    <a class="secondary-button" href="{{ url_for('index') }}">Open booking page</a>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat card"><span>Today</span><strong>{{ today_bookings }}</strong><small>walks booked</small></div>
+    <div class="stat card"><span>Upcoming</span><strong>{{ upcoming_count }}</strong><small>future walks</small></div>
+    <div class="stat card"><span>Total</span><strong>{{ total_bookings }}</strong><small>active bookings</small></div>
+    <div class="stat card"><span>People</span><strong>{{ unique_walkers }}</strong><small>unique walkers</small></div>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="card next-card">
+      <div class="card-title-row"><h2>Next walk</h2><span class="live-dot">Live</span></div>
+      {% if next_booking %}
+        <div class="next-time">{{ format_time(next_booking['start_time']) }}</div>
+        <div class="next-date">{{ format_date(next_booking['date']) }}</div>
+        <div class="next-person">with <strong>{{ next_booking['name'] }}</strong></div>
+      {% else %}
+        <div class="empty-state">No upcoming walks yet.</div>
+      {% endif %}
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-title-row"><h2>Last 7 days</h2><span class="muted">walks/day</span></div>
+      <div class="bar-chart">
+        {% for day in daily_counts %}
+          <div class="bar-column">
+            <div class="bar-value">{{ day.count }}</div>
+            <div class="bar-track"><div class="bar" style="height: {{ day.height }}%"></div></div>
+            <div class="bar-label">{{ day.label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card calendar-card">
+    <div>
+      <div class="card-title-row"><h2>Calendar subscription</h2><span class="pill">Auto-updating</span></div>
+      <p>Subscribe to this URL in Apple Calendar, Google Calendar, or Outlook. New bookings automatically appear when the calendar app refreshes the feed.</p>
+      <p class="field-note">Timezone: {{ timezone_name }}. Keep this private because it contains Jack's schedule.</p>
+    </div>
+    <div class="copy-row">
+      <input id="calendar-url" readonly value="{{ calendar_url }}">
+      <button id="copy-calendar" class="secondary-button" type="button">Copy URL</button>
+    </div>
+  </div>
+
+  <div class="card schedule-card">
+    <div class="card-title-row"><h2>Upcoming walks</h2><span class="muted">Next {{ upcoming|length }}</span></div>
+    {% if upcoming %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Time</th><th>Walker</th><th>Email</th><th></th></tr></thead>
+          <tbody>
+          {% for booking in upcoming %}
+            <tr>
+              <td>{{ format_date(booking['date']) }}</td>
+              <td>{{ format_time(booking['start_time']) }}</td>
+              <td><strong>{{ booking['name'] }}</strong></td>
+              <td>{{ booking['email'] }}</td>
+              <td>
+                <form method="post" action="{{ url_for('cancel_booking', booking_id=booking['id']) }}" onsubmit="return confirm('Cancel this walk?');">
+                  <button class="danger-link" type="submit">Cancel</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">No upcoming bookings.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const copyButton = document.getElementById('copy-calendar');
+  const calendarUrl = document.getElementById('calendar-url');
+  copyButton?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(calendarUrl.value);
+      copyButton.textContent = 'Copied!';
+      setTimeout(() => copyButton.textContent = 'Copy URL', 1600);
+    } catch {
+      calendarUrl.select();
+      document.execCommand('copy');
+    }
+  });
+</script>
+{% endblock %}
