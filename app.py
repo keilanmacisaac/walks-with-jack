@@ -1,9 +1,11 @@
 import os
 import re
+import secrets
 import sqlite3
 from datetime import date, datetime, time, timedelta
 from functools import wraps
 from pathlib import Path
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from flask import (
@@ -50,6 +52,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-secret-key")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=90)
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -98,6 +101,47 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_bookings_date_time
         ON bookings(date, start_time);
         """
+    )
+
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(bookings)").fetchall()}
+    if "contact_type" not in columns:
+        db.execute("ALTER TABLE bookings ADD COLUMN contact_type TEXT")
+    if "contact" not in columns:
+        db.execute("ALTER TABLE bookings ADD COLUMN contact TEXT")
+    if "manage_token" not in columns:
+        db.execute("ALTER TABLE bookings ADD COLUMN manage_token TEXT")
+
+    # Backfill legacy email-only bookings without losing existing data.
+    db.execute(
+        """
+        UPDATE bookings
+        SET contact_type = 'email', contact = lower(email)
+        WHERE contact_type IS NULL OR trim(contact_type) = '' OR contact IS NULL OR trim(contact) = ''
+        """
+    )
+    legacy_contacts = db.execute(
+        """
+        SELECT DISTINCT contact_type, contact
+        FROM bookings
+        WHERE manage_token IS NULL OR trim(manage_token) = ''
+        """
+    ).fetchall()
+    for row in legacy_contacts:
+        token = secrets.token_urlsafe(24)
+        db.execute(
+            """
+            UPDATE bookings SET manage_token = ?
+            WHERE contact_type = ? AND contact = ?
+              AND (manage_token IS NULL OR trim(manage_token) = '')
+            """,
+            (token, row["contact_type"], row["contact"]),
+        )
+
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bookings_contact_date ON bookings(contact_type, contact, date)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bookings_manage_token ON bookings(manage_token)"
     )
     db.commit()
 
@@ -176,6 +220,48 @@ def format_date(iso_date: str):
     return f"{dt.strftime('%A, %B')} {dt.day}, {dt.year}"
 
 
+def normalize_contact(contact_method: str, raw_contact: str):
+    method = (contact_method or "").strip().lower()
+    raw = (raw_contact or "").strip()
+    if method == "email":
+        value = raw.lower()
+        if not EMAIL_RE.match(value) or len(value) > 160:
+            return None
+        return value
+    if method == "phone":
+        digits = re.sub(r"\D", "", raw)
+        if len(digits) < 7 or len(digits) > 15:
+            return None
+        return ("+" if raw.startswith("+") else "") + digits
+    return None
+
+
+def format_phone(value: str):
+    digits = re.sub(r"\D", "", value or "")
+    if len(digits) == 10:
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+1 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+    return value
+
+
+def contact_display(row):
+    method = row["contact_type"] if "contact_type" in row.keys() else "email"
+    contact = row["contact"] if "contact" in row.keys() else row["email"]
+    if method == "phone":
+        return format_phone(contact)
+    return contact
+
+
+def booking_is_upcoming(row):
+    if row["status"] != "booked":
+        return False
+    start_dt = datetime.strptime(
+        f"{row['date']} {row['start_time']}", "%Y-%m-%d %H:%M"
+    ).replace(tzinfo=TZ)
+    return start_dt > now_local()
+
+
 def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -195,12 +281,59 @@ def escape_ics(value: str):
     )
 
 
+def booking_datetimes(row):
+    start_dt = datetime.strptime(
+        f"{row['date']} {row['start_time']}", "%Y-%m-%d %H:%M"
+    )
+    end_dt = datetime.strptime(
+        f"{row['date']} {row['end_time']}", "%Y-%m-%d %H:%M"
+    )
+    return start_dt, end_dt
+
+
+def single_booking_ics(row):
+    start_dt, end_dt = booking_datetimes(row)
+    stamp = datetime.now(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Walks with Jack//Booking//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "BEGIN:VEVENT",
+        f"UID:walk-{row['id']}@walks-with-jack",
+        f"DTSTAMP:{stamp}",
+        f"DTSTART;TZID={TIMEZONE_NAME}:{start_dt.strftime('%Y%m%dT%H%M%S')}",
+        f"DTEND;TZID={TIMEZONE_NAME}:{end_dt.strftime('%Y%m%dT%H%M%S')}",
+        f"SUMMARY:{escape_ics('Walk with Jack')}",
+        "DESCRIPTION:Free 5-minute walk booked through Walks with Jack.",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ]
+    return "\r\n".join(lines) + "\r\n"
+
+
+def google_calendar_url(row):
+    start_dt, end_dt = booking_datetimes(row)
+    params = {
+        "action": "TEMPLATE",
+        "text": "Walk with Jack",
+        "dates": f"{start_dt.strftime('%Y%m%dT%H%M%S')}/{end_dt.strftime('%Y%m%dT%H%M%S')}",
+        "details": "Free 5-minute walk booked through Walks with Jack.",
+        "ctz": TIMEZONE_NAME,
+    }
+    return "https://calendar.google.com/calendar/render?" + urlencode(params)
+
+
 @app.context_processor
 def template_helpers():
     return {
         "app_name": APP_NAME,
         "format_time": format_time,
         "format_date": format_date,
+        "contact_display": contact_display,
+        "booking_is_upcoming": booking_is_upcoming,
+        "google_calendar_url": google_calendar_url,
     }
 
 
@@ -234,15 +367,17 @@ def api_slots():
 @app.post("/book")
 def book():
     name = " ".join(request.form.get("name", "").strip().split())
-    email = request.form.get("email", "").strip().lower()
+    contact_method = request.form.get("contact_method", "email").strip().lower()
+    contact = normalize_contact(contact_method, request.form.get("contact", ""))
     day = parse_date(request.form.get("date"))
     start = parse_hhmm(request.form.get("start_time"))
 
     if len(name) < 2 or len(name) > 80:
         flash("Please enter your name.", "error")
         return redirect(url_for("index", date=request.form.get("date", "")))
-    if not EMAIL_RE.match(email) or len(email) > 160:
-        flash("Please enter a valid email address.", "error")
+    if contact is None:
+        label = "email address" if contact_method == "email" else "phone number"
+        flash(f"Please enter a valid {label}.", "error")
         return redirect(url_for("index", date=request.form.get("date", "")))
     if day is None or not within_booking_window(day):
         flash("That date is not available for booking.", "error")
@@ -266,9 +401,9 @@ def book():
             """
             SELECT COUNT(*) AS count
             FROM bookings
-            WHERE lower(email) = lower(?) AND date = ? AND status = 'booked'
+            WHERE contact_type = ? AND contact = ? AND date = ? AND status = 'booked'
             """,
-            (email, day.isoformat()),
+            (contact_method, contact, day.isoformat()),
         ).fetchone()["count"]
 
         if daily_count >= 2:
@@ -289,18 +424,35 @@ def book():
             flash("Someone just booked that time. Please choose another slot.", "error")
             return redirect(url_for("index", date=day.isoformat()))
 
+        existing = db.execute(
+            """
+            SELECT manage_token FROM bookings
+            WHERE contact_type = ? AND contact = ? AND manage_token IS NOT NULL
+            ORDER BY id DESC LIMIT 1
+            """,
+            (contact_method, contact),
+        ).fetchone()
+        manage_token = existing["manage_token"] if existing else secrets.token_urlsafe(24)
+
+        # Keep the original email column populated for compatibility with the old schema.
+        email_value = contact if contact_method == "email" else ""
         cursor = db.execute(
             """
-            INSERT INTO bookings (name, email, date, start_time, end_time, status, created_at)
-            VALUES (?, ?, ?, ?, ?, 'booked', ?)
+            INSERT INTO bookings
+                (name, email, date, start_time, end_time, status, created_at,
+                 contact_type, contact, manage_token)
+            VALUES (?, ?, ?, ?, ?, 'booked', ?, ?, ?, ?)
             """,
             (
                 name,
-                email,
+                email_value,
                 day.isoformat(),
                 start.strftime("%H:%M"),
                 end_dt.strftime("%H:%M"),
                 now_local().isoformat(),
+                contact_method,
+                contact,
+                manage_token,
             ),
         )
         booking_id = cursor.lastrowid
@@ -310,7 +462,9 @@ def book():
         flash("Someone just booked that time. Please choose another slot.", "error")
         return redirect(url_for("index", date=day.isoformat()))
 
-    return redirect(url_for("booking_success", booking_id=booking_id))
+    session.permanent = True
+    session["walker_token"] = manage_token
+    return redirect(url_for("booking_success", booking_id=booking_id, token=manage_token))
 
 
 @app.get("/booking/<int:booking_id>")
@@ -318,9 +472,93 @@ def booking_success(booking_id):
     booking = get_db().execute(
         "SELECT * FROM bookings WHERE id = ?", (booking_id,)
     ).fetchone()
+    token = request.args.get("token") or session.get("walker_token")
+    if booking is None or not token or token != booking["manage_token"]:
+        return "Booking not found", 404
+    session.permanent = True
+    session["walker_token"] = token
+    return render_template("success.html", booking=booking, manage_token=token)
+
+
+# -----------------------------
+# Walker dashboard
+# -----------------------------
+@app.get("/my")
+def my_bookings():
+    token = session.get("walker_token")
+    if token:
+        return redirect(url_for("walker_dashboard", token=token))
+    return render_template("my_missing.html")
+
+
+@app.get("/my/<token>")
+def walker_dashboard(token):
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT * FROM bookings
+        WHERE manage_token = ?
+        ORDER BY date DESC, start_time DESC
+        """,
+        (token,),
+    ).fetchall()
+    if not rows:
+        return "Dashboard not found", 404
+
+    session.permanent = True
+    session["walker_token"] = token
+    upcoming = [row for row in rows if booking_is_upcoming(row)]
+    history = [row for row in rows if not booking_is_upcoming(row)]
+    profile = rows[0]
+    return render_template(
+        "my_bookings.html",
+        manage_token=token,
+        profile=profile,
+        upcoming=sorted(upcoming, key=lambda r: (r["date"], r["start_time"])),
+        history=history,
+    )
+
+
+@app.post("/my/<token>/bookings/<int:booking_id>/cancel")
+def walker_cancel_booking(token, booking_id):
+    db = get_db()
+    booking = db.execute(
+        "SELECT * FROM bookings WHERE id = ? AND manage_token = ?",
+        (booking_id, token),
+    ).fetchone()
+    if booking is None:
+        flash("Booking not found.", "error")
+    elif booking["status"] == "cancelled":
+        flash("That booking is already cancelled.", "error")
+    elif not booking_is_upcoming(booking):
+        flash("Past walks cannot be cancelled.", "error")
+    else:
+        db.execute(
+            "UPDATE bookings SET status = 'cancelled' WHERE id = ?", (booking_id,)
+        )
+        db.commit()
+        flash("Your walk was cancelled and the time is available again.", "success")
+    return redirect(url_for("walker_dashboard", token=token))
+
+
+@app.get("/my/<token>/bookings/<int:booking_id>/calendar.ics")
+def booking_calendar_download(token, booking_id):
+    booking = get_db().execute(
+        "SELECT * FROM bookings WHERE id = ? AND manage_token = ? AND status = 'booked'",
+        (booking_id, token),
+    ).fetchone()
     if booking is None:
         return "Booking not found", 404
-    return render_template("success.html", booking=booking)
+    body = single_booking_ics(booking)
+    filename = f"walk-with-jack-{booking['date']}-{booking['start_time'].replace(':', '')}.ics"
+    return Response(
+        body,
+        mimetype="text/calendar",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+    )
 
 
 # -----------------------------
@@ -331,7 +569,10 @@ def admin_login():
     if request.method == "POST":
         password = request.form.get("password", "")
         if password == ADMIN_PASSWORD:
+            walker_token = session.get("walker_token")
             session.clear()
+            if walker_token:
+                session["walker_token"] = walker_token
             session["admin_logged_in"] = True
             return redirect(request.args.get("next") or url_for("admin_dashboard"))
         flash("Incorrect password.", "error")
@@ -340,7 +581,10 @@ def admin_login():
 
 @app.post("/admin/logout")
 def admin_logout():
+    walker_token = session.get("walker_token")
     session.clear()
+    if walker_token:
+        session["walker_token"] = walker_token
     return redirect(url_for("index"))
 
 
@@ -368,7 +612,10 @@ def admin_dashboard():
         (today, today, current_time),
     ).fetchone()["count"]
     unique_walkers = db.execute(
-        "SELECT COUNT(DISTINCT lower(email)) AS count FROM bookings WHERE status = 'booked'"
+        """
+        SELECT COUNT(DISTINCT contact_type || ':' || contact) AS count
+        FROM bookings WHERE status = 'booked'
+        """
     ).fetchone()["count"]
 
     upcoming = db.execute(
@@ -456,7 +703,7 @@ def calendar_feed():
         (today,),
     ).fetchall()
 
-    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
@@ -470,12 +717,7 @@ def calendar_feed():
     ]
 
     for row in rows:
-        start_dt = datetime.strptime(
-            f"{row['date']} {row['start_time']}", "%Y-%m-%d %H:%M"
-        )
-        end_dt = datetime.strptime(
-            f"{row['date']} {row['end_time']}", "%Y-%m-%d %H:%M"
-        )
+        start_dt, end_dt = booking_datetimes(row)
         lines.extend(
             [
                 "BEGIN:VEVENT",
