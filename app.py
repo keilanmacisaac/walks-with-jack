@@ -111,7 +111,6 @@ def init_db():
     if "manage_token" not in columns:
         db.execute("ALTER TABLE bookings ADD COLUMN manage_token TEXT")
 
-    # Backfill legacy email-only bookings without losing existing data.
     db.execute(
         """
         UPDATE bookings
@@ -424,17 +423,22 @@ def book():
             flash("Someone just booked that time. Please choose another slot.", "error")
             return redirect(url_for("index", date=day.isoformat()))
 
-        existing = db.execute(
-            """
-            SELECT manage_token FROM bookings
-            WHERE contact_type = ? AND contact = ? AND manage_token IS NOT NULL
-            ORDER BY id DESC LIMIT 1
-            """,
-            (contact_method, contact),
-        ).fetchone()
-        manage_token = existing["manage_token"] if existing else secrets.token_urlsafe(24)
+        manage_token = None
+        session_token = session.get("walker_token")
+        if session_token:
+            owned = db.execute(
+                """
+                SELECT 1 FROM bookings
+                WHERE manage_token = ? AND contact_type = ? AND contact = ?
+                LIMIT 1
+                """,
+                (session_token, contact_method, contact),
+            ).fetchone()
+            if owned:
+                manage_token = session_token
+        if not manage_token:
+            manage_token = secrets.token_urlsafe(24)
 
-        # Keep the original email column populated for compatibility with the old schema.
         email_value = contact if contact_method == "email" else ""
         cursor = db.execute(
             """
