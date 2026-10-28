@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}My Bookings · {{ app_name }}{% endblock %}
+{% block header_action %}<a class="quiet-link" href="{{ url_for('index') }}">Book a walk</a>{% endblock %}
+
+{% block content %}
+<section class="center-wrap">
+  <div class="card login-card">
+    <div class="eyebrow">MY BOOKINGS</div>
+    <h1>No dashboard saved on this device.</h1>
+    <p class="hero-copy">After you book a walk, your private My Bookings dashboard will be saved on this device and shown on your confirmation page.</p>
+    <a class="primary-button button-link" href="{{ url_for('index') }}">Book a walk</a>
+  </div>
+</section>
+{% endblock %}
