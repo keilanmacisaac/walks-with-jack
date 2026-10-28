@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Walk booked · {{ app_name }}{% endblock %}
+{% block header_action %}<a class="quiet-link" href="{{ url_for('walker_dashboard', token=manage_token) }}">My bookings</a>{% endblock %}
 
 {% block content %}
 <section class="center-wrap">
@@ -24,8 +25,14 @@
       </div>
     </div>
 
-    <a class="primary-button button-link" href="{{ url_for('index') }}">Book another walk</a>
-    <p class="field-note centered">You can book up to two walks on the same day.</p>
+    <div class="calendar-actions">
+      <a class="secondary-button" href="{{ url_for('booking_calendar_download', token=manage_token, booking_id=booking['id']) }}">Add to Apple / Outlook</a>
+      <a class="secondary-button" href="{{ google_calendar_url(booking) }}" target="_blank" rel="noopener">Add to Google Calendar</a>
+    </div>
+
+    <a class="primary-button button-link" href="{{ url_for('walker_dashboard', token=manage_token) }}">Manage my bookings</a>
+    <a class="text-link centered-link" href="{{ url_for('index') }}">Book another walk</a>
+    <p class="field-note centered">Keep your My Bookings page private. It lets you view and cancel your walks.</p>
   </div>
 </section>
 {% endblock %}
