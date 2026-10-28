@@ -1,0 +1,115 @@
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  padding: 14px 15px;
+  color: var(--ink);
+  outline: none;
+  font: inherit;
+  resize: vertical;
+  min-height: 96px;
+}
+textarea:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(30, 102, 84, .10);
+}
+
+.admin-booking-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+.admin-booking-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fbfdfc;
+  padding: 18px;
+}
+.admin-booking-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.admin-booking-name { font-weight: 800; font-size: 17px; }
+.admin-booking-meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.admin-note-block {
+  background: var(--cream);
+  border-radius: 14px;
+  padding: 13px;
+  margin-top: 14px;
+}
+.admin-note-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 10px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.admin-note-text { white-space: pre-wrap; line-height: 1.5; font-size: 13px; }
+.admin-note-empty { color: var(--muted); font-size: 13px; }
+.admin-controls-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+.admin-control-box {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: white;
+}
+.admin-control-box h3 {
+  margin: 0 0 10px;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+}
+.admin-control-box label { margin-top: 10px; }
+.admin-control-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.small-secondary-button {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: var(--mint);
+  color: var(--green-dark);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+.delete-booking-button {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: #fae9e7;
+  color: var(--danger);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+.walker-note-editor {
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.walker-note-editor label { margin-top: 0; }
+.walker-note-display {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.note-counter { color: var(--muted); font-size: 11px; margin-top: 5px; }
+
+@media (max-width: 760px) {
+  .admin-controls-grid { grid-template-columns: 1fr; }
+  .admin-booking-top { flex-direction: column; }
+}
